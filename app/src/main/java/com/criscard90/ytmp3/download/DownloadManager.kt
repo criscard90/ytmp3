@@ -91,16 +91,29 @@ object DownloadManager {
         val mp3File = File(tmpDir, "$videoId.mp3")
         try {
             setState(videoId, DownloadState.Resolving)
-            val stream = InnertubePlayer.bestAudioStream(videoId)
+            // L'URL firmato può essere rifiutato con 403 in modo intermittente
+            // (scadenza/firma legata alla rete): in quel caso lo richiediamo
+            // fresco una seconda volta prima di arrenderci.
+            var stream = InnertubePlayer.bestAudioStream(videoId)
 
             setState(videoId, DownloadState.Downloading(-1))
-            Downloader.download(stream.url, srcFile) { read, total ->
-                val progress = if (total > 0) {
-                    ((read * 100) / total).toInt().coerceIn(0, 100)
-                } else {
-                    -1
+            try {
+                downloadStream(videoId, stream.url, srcFile)
+            } catch (e: IOException) {
+                if (!e.message.orEmpty().contains("403")) throw e
+                setState(videoId, DownloadState.Resolving)
+                stream = InnertubePlayer.bestAudioStream(videoId)
+                setState(videoId, DownloadState.Downloading(-1))
+                try {
+                    downloadStream(videoId, stream.url, srcFile)
+                } catch (retry: IOException) {
+                    throw IOException(
+                        "Download rifiutato da YouTube (HTTP 403). " +
+                            "Riprova tra poco o con un'altra rete: " +
+                            (retry.message ?: "errore di rete"),
+                        retry,
+                    )
                 }
-                setState(videoId, DownloadState.Downloading(progress))
             }
 
             setState(videoId, DownloadState.Converting)
@@ -115,6 +128,17 @@ object DownloadManager {
         } finally {
             srcFile.delete()
             mp3File.delete()
+        }
+    }
+
+    private fun downloadStream(videoId: String, url: String, srcFile: File) {
+        Downloader.download(url, srcFile) { read, total ->
+            val progress = if (total > 0) {
+                ((read * 100) / total).toInt().coerceIn(0, 100)
+            } else {
+                -1
+            }
+            setState(videoId, DownloadState.Downloading(progress))
         }
     }
 

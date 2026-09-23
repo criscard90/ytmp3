@@ -126,6 +126,12 @@ class PlayerActivity : ComponentActivity() {
             .setUserAgent(InnertubePlayer.USER_AGENT)
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(30_000)
+            .setDefaultRequestProperties(
+                mapOf(
+                    "Referer" to "https://www.youtube.com/",
+                    "Origin" to "https://www.youtube.com",
+                )
+            )
         val factory = ProgressiveMediaSource.Factory(httpFactory)
         val video = factory.createMediaSource(MediaItem.fromUri(sources.videoUrl))
         val audioUrl = sources.audioUrl

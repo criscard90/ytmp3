@@ -8,6 +8,10 @@ import java.io.IOException
 
 /**
  * Download di un flusso audio da googlevideo.com con notifica di progresso.
+ *
+ * Gli URL firmati di YouTube sono legati a IP/rete e possono scadere o venire
+ * rifiutati con 403 in modo intermittente: per questo il download usa un
+ * `Range` iniziale (richiesta parziale, più tollerata) e headers da browser.
  */
 object Downloader {
 
@@ -18,6 +22,12 @@ object Downloader {
         val request = Request.Builder()
             .url(url)
             .header("User-Agent", InnertubePlayer.USER_AGENT)
+            .header("Referer", "https://www.youtube.com/")
+            .header("Origin", "https://www.youtube.com")
+            .header("Accept", "*/*")
+            .header("Accept-Language", "it-IT,it;q=0.9,en;q=0.8")
+            // Richiesta parziale: meglio tollerata dai server googlevideo
+            .header("Range", "bytes=0-")
             .build()
 
         HttpClient.client.newCall(request).execute().use { response ->
