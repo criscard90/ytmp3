@@ -1,8 +1,6 @@
 package com.criscard90.ytmp3.download
 
 import android.content.Context
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
 import com.criscard90.ytmp3.util.sanitizeFileName
 import com.criscard90.ytmp3.youtube.InnertubePlayer
 import com.criscard90.ytmp3.youtube.VideoSearchItem
@@ -117,10 +115,17 @@ object DownloadManager {
             }
 
             setState(videoId, DownloadState.Converting)
-            Mp3Converter.convert(srcFile, mp3File, title, channel)
+            val converted = Mp3Converter.convert(srcFile, mp3File, title, channel)
 
-            val displayName = "${sanitizeFileName(title)}.mp3"
-            MediaStoreSaver.save(appContext, mp3File, displayName, title, channel)
+            val displayName = "${sanitizeFileName(title)}.${converted.extension}"
+            MediaStoreSaver.save(
+                appContext,
+                converted.file,
+                displayName,
+                title,
+                channel,
+                converted.mimeType,
+            )
 
             setState(videoId, DownloadState.Done(displayName))
         } catch (t: Throwable) {
@@ -128,6 +133,7 @@ object DownloadManager {
         } finally {
             srcFile.delete()
             mp3File.delete()
+            File(tmpDir, "$videoId.m4a").delete()
         }
     }
 

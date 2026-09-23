@@ -8,10 +8,11 @@ import android.provider.MediaStore
 import com.criscard90.ytmp3.util.formatBytes
 import com.criscard90.ytmp3.util.formatDate
 
-/** Un MP3 presente nella cartella `Music/ytmp3`. */
+/** Un file audio presente nella cartella `Music/ytmp3` (MP3 o M4A di fallback). */
 data class DownloadedTrack(
     val uri: Uri,
     val title: String,
+    val mimeType: String = "audio/mpeg",
     val sizeBytes: Long,
     val dateMillis: Long,
 ) {
@@ -54,13 +55,18 @@ object DownloadsRepository {
             val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_MODIFIED)
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
+                val displayName = cursor.getString(nameCol).orEmpty()
+                val mimeCol = cursor.getColumnIndex(MediaStore.Audio.Media.MIME_TYPE)
+                val mime = if (mimeCol >= 0) cursor.getString(mimeCol).orEmpty() else ""
                 val title = cursor.getString(titleCol)
-                    ?: cursor.getString(nameCol)?.removeSuffix(".mp3")
+                    ?: displayName.removeSuffix(".mp3").removeSuffix(".m4a")
+                        .takeIf { it.isNotEmpty() }
                     ?: "Audio"
                 tracks.add(
                     DownloadedTrack(
                         uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id),
                         title = title,
+                        mimeType = mime,
                         sizeBytes = cursor.getLong(sizeCol),
                         dateMillis = cursor.getLong(dateCol),
                     )
@@ -79,8 +85,11 @@ object DownloadsRepository {
         }
     }
 
-    /** Intent per riprodurre il MP3 con un player esterno. */
+    /** Intent per riprodurre il file con un player esterno (MP3 o M4A). */
     fun playIntent(track: DownloadedTrack): Intent = Intent(Intent.ACTION_VIEW)
-        .setDataAndType(track.uri, "audio/mpeg")
+        .setDataAndType(
+            track.uri,
+            track.mimeType.takeIf { it.startsWith("audio/") } ?: "audio/*",
+        )
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 }

@@ -17,15 +17,16 @@ object MediaStoreSaver {
     /** Restituisce il nome effettivamente assegnato (MediaStore gestisce le collisioni). */
     fun save(
         context: Context,
-        mp3File: File,
+        audioFile: File,
         displayName: String,
         title: String,
         channel: String,
+        mimeType: String = "audio/mpeg",
     ): String {
         val resolver = context.contentResolver
         val values = ContentValues().apply {
             put(MediaStore.Audio.Media.DISPLAY_NAME, displayName)
-            put(MediaStore.Audio.Media.MIME_TYPE, "audio/mpeg")
+            put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
             put(MediaStore.Audio.Media.RELATIVE_PATH, "${Environment.DIRECTORY_MUSIC}/ytmp3")
             put(MediaStore.Audio.Media.IS_PENDING, 1)
             put(MediaStore.Audio.Media.TITLE, title)
@@ -39,7 +40,7 @@ object MediaStoreSaver {
             val output = resolver.openOutputStream(uri)
                 ?: throw IOException("Stream di scrittura non disponibile")
             output.use { out ->
-                mp3File.inputStream().use { input -> input.copyTo(out) }
+                audioFile.inputStream().use { input -> input.copyTo(out) }
             }
             val done = ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }
             resolver.update(uri, done, null, null)

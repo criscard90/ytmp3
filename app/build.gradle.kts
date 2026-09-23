@@ -5,7 +5,6 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
-
 // Versione: locale 1.0.0, in CI 1.0.<run_number> (ad ogni push sale il build number)
 val ciRunNumber = (findProperty("ciRunNumber") as String?)?.toIntOrNull() ?: 0
 
