@@ -6,17 +6,24 @@ import org.json.JSONObject
 /**
  * Recupero dello stream audio tramite l'endpoint `player` di Innertube.
  *
- * I client ANDROID (e il fallback ANDROID_VR) restituiscono URL diretti senza
- * cifratura e senza login. Verificati funzionanti senza autenticazione.
+ * YouTube rifiuta con HTTP 403 gli URL audio dei client ANDROID/ANDROID_VR quando
+ * manca il PO token (integrity check lato Google impossibile da generare in un'app
+ * di terze parti: è firmato con chiavi del dispositivo). Per questo il client
+ * primario è VISIONOS, che non richiede PO token e restituisce URL scaricabili
+ * senza login (verificato: audio itag 140/251 + video fino a 4K). ANDROID e
+ * ANDROID_VR restano come fallback.
  */
 object InnertubePlayer {
 
-    /** User-Agent dell'app YouTube per Android (necessario per il client ANDROID). */
+    /** User-Agent dell'app YouTube per Android (usato come fallback). */
     const val USER_AGENT =
-        "com.google.android.youtube/20.10.37 (Linux; U; Android 15) gzip"
+        "com.google.android.youtube/21.26.364 (Linux; U; Android 11) gzip"
     private const val ANDROID_USER_AGENT = USER_AGENT
     private const val ANDROID_VR_USER_AGENT =
-        "com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12; VR) gzip"
+        "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip"
+    /** User-Agent VISIONOS: va riusato anche in download per non ricevere 403. */
+    const val VISIONOS_USER_AGENT =
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
 
     private data class PlayerClient(
         val name: String,
@@ -26,17 +33,23 @@ object InnertubePlayer {
     )
 
     private fun clients(): List<PlayerClient> = listOf(
-        PlayerClient("ANDROID", "20.10.37", ANDROID_USER_AGENT) {
-            it.put("androidSdkVersion", 35)
-                .put("osName", "Android")
-                .put("osVersion", "15")
-                .put("deviceMake", "Google")
-                .put("deviceModel", "Pixel 8")
+        PlayerClient("VISIONOS", "1.02", VISIONOS_USER_AGENT) {
+            it.put("deviceMake", "Apple")
+                .put("deviceModel", "RealityDevice17,1")
+                .put("osName", "visionOS")
+                .put("osVersion", "26.5.23O471")
         },
-        PlayerClient("ANDROID_VR", "1.60.19", ANDROID_VR_USER_AGENT) {
-            it.put("androidSdkVersion", 34)
+        PlayerClient("ANDROID", "21.26.364", ANDROID_USER_AGENT) {
+            it.put("androidSdkVersion", 30)
                 .put("osName", "Android")
-                .put("osVersion", "12")
+                .put("osVersion", "11")
+        },
+        PlayerClient("ANDROID_VR", "1.65.10", ANDROID_VR_USER_AGENT) {
+            it.put("androidSdkVersion", 32)
+                .put("osName", "Android")
+                .put("osVersion", "12L")
+                .put("deviceMake", "Oculus")
+                .put("deviceModel", "Quest 3")
         },
     )
 
@@ -119,6 +132,7 @@ object InnertubePlayer {
                 mimeType = mimeType,
                 bitrate = bitrate,
                 contentLength = format.optLong("contentLength", -1L),
+                userAgent = client.userAgent,
             )
         }
 
@@ -151,7 +165,7 @@ object InnertubePlayer {
         for (client in clients()) {
             try {
                 val root = playerResponse(client, videoId)
-                return parsePlaybackSources(root)
+                return parsePlaybackSources(root, client.userAgent)
             } catch (t: Throwable) {
                 errors.add("${client.name}: ${t.message}")
             }
@@ -161,7 +175,7 @@ object InnertubePlayer {
         )
     }
 
-    private fun parsePlaybackSources(root: JSONObject): PlaybackSources {
+    private fun parsePlaybackSources(root: JSONObject, userAgent: String): PlaybackSources {
         val streaming = root.optJSONObject("streamingData")
             ?: throw IllegalStateException("nessun formato disponibile")
 
@@ -235,6 +249,7 @@ object InnertubePlayer {
                     audioUrl = bestAudio.url,
                     height = bestVideo.height,
                     isMuxed = false,
+                    userAgent = userAgent,
                 )
             bestMuxed != null ->
                 PlaybackSources(
@@ -242,6 +257,7 @@ object InnertubePlayer {
                     audioUrl = null,
                     height = bestMuxed.height,
                     isMuxed = true,
+                    userAgent = userAgent,
                 )
             else -> throw IllegalStateException("nessun formato video riproducibile")
         }
@@ -259,4 +275,6 @@ data class PlaybackSources(
     val audioUrl: String?,
     val height: Int,
     val isMuxed: Boolean,
+    /** User-Agent del client che ha emesso gli URL: riusarlo riduce i rifiuti 403. */
+    val userAgent: String = "",
 )

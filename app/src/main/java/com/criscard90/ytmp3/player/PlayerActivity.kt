@@ -122,8 +122,10 @@ class PlayerActivity : ComponentActivity() {
 
     /** Crea la MediaSource: video adattivo fuso con l'audio, oppure il flusso muxed. */
     private fun buildSource(sources: PlaybackSources): MediaSource {
+        // Stesso User-Agent del client che ha emesso gli URL (anti-403).
+        val agent = sources.userAgent.ifEmpty { InnertubePlayer.USER_AGENT }
         val httpFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent(InnertubePlayer.USER_AGENT)
+            .setUserAgent(agent)
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(30_000)
             .setDefaultRequestProperties(

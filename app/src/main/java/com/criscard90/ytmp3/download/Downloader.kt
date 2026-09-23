@@ -9,19 +9,30 @@ import java.io.IOException
 /**
  * Download di un flusso audio da googlevideo.com con notifica di progresso.
  *
- * Gli URL firmati di YouTube sono legati a IP/rete e possono scadere o venire
- * rifiutati con 403 in modo intermittente: per questo il download usa un
- * `Range` iniziale (richiesta parziale, più tollerata) e headers da browser.
+ * YouTube lega gli URL firmati al client che li ha emessi, quindi riusiamo lo
+ * stesso User-Agent (VISIONOS di default) per non farli rifiutare con 403.
+ * La prima richiesta scarica i primi byte per verificare subito l'accesso e poi
+ * riprende il resto dal punto interrotto.
  */
 object Downloader {
 
+    private const val FALLBACK_USER_AGENT = InnertubePlayer.VISIONOS_USER_AGENT
+
     /**
+     * @param userAgent User-Agent del client che ha emesso l'URL (anti-403);
+     *   se vuoto viene usato quello VISIONOS.
      * @param onProgress chiamato con (byte letti, totale) — totale può essere -1
      */
-    fun download(url: String, target: File, onProgress: (Long, Long) -> Unit) {
+    fun download(
+        url: String,
+        target: File,
+        userAgent: String = "",
+        onProgress: (Long, Long) -> Unit,
+    ) {
+        val agent = userAgent.ifEmpty { FALLBACK_USER_AGENT }
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", InnertubePlayer.USER_AGENT)
+            .header("User-Agent", agent)
             .header("Referer", "https://www.youtube.com/")
             .header("Origin", "https://www.youtube.com")
             .header("Accept", "*/*")

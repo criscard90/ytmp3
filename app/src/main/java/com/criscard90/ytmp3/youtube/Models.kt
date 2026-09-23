@@ -32,6 +32,8 @@ data class AudioStreamInfo(
     val mimeType: String,
     val bitrate: Int,
     val contentLength: Long,
+    /** User-Agent con cui YouTube ha emesso l'URL: riusarlo riduce i rifiuti 403. */
+    val userAgent: String = "",
 ) {
     val container: String
         get() = mimeType.substringBefore(";").substringAfter("/").trim()

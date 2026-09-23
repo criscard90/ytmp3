@@ -2,6 +2,7 @@ package com.criscard90.ytmp3.download
 
 import android.content.Context
 import com.criscard90.ytmp3.util.sanitizeFileName
+import com.criscard90.ytmp3.youtube.AudioStreamInfo
 import com.criscard90.ytmp3.youtube.InnertubePlayer
 import com.criscard90.ytmp3.youtube.VideoSearchItem
 import kotlinx.coroutines.CoroutineScope
@@ -96,14 +97,14 @@ object DownloadManager {
 
             setState(videoId, DownloadState.Downloading(-1))
             try {
-                downloadStream(videoId, stream.url, srcFile)
+                downloadStream(videoId, stream, srcFile)
             } catch (e: IOException) {
                 if (!e.message.orEmpty().contains("403")) throw e
                 setState(videoId, DownloadState.Resolving)
                 stream = InnertubePlayer.bestAudioStream(videoId)
                 setState(videoId, DownloadState.Downloading(-1))
                 try {
-                    downloadStream(videoId, stream.url, srcFile)
+                    downloadStream(videoId, stream, srcFile)
                 } catch (retry: IOException) {
                     throw IOException(
                         "Download rifiutato da YouTube (HTTP 403). " +
@@ -137,8 +138,8 @@ object DownloadManager {
         }
     }
 
-    private fun downloadStream(videoId: String, url: String, srcFile: File) {
-        Downloader.download(url, srcFile) { read, total ->
+    private fun downloadStream(videoId: String, stream: AudioStreamInfo, srcFile: File) {
+        Downloader.download(stream.url, srcFile, stream.userAgent) { read, total ->
             val progress = if (total > 0) {
                 ((read * 100) / total).toInt().coerceIn(0, 100)
             } else {
