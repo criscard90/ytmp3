@@ -67,7 +67,8 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: "ytmp3 v1.0.${{ github.run_number }}"
-          prerelease: true
+          prerelease: false
+          make_latest: true
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: app/build/outputs/apk/release/ytmp3-*.apk
