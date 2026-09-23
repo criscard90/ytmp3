@@ -5,6 +5,7 @@ App Android dal **design ispirato a YouTube** (tema scuro, rosso YouTube) per **
 ## Funzionalità
 
 - 🔍 **Ricerca YouTube senza account** tramite l'API pubblica Innertube (nessun login Google richiesto)
+- ▶️ **Riproduzione video in-app** (Media3/ExoPlayer, fino a 1080p, video+audio fusi) e **apertura nel link YouTube** (app YouTube o browser)
 - 🎧 **Download audio in MP3 320 kbps**: viene selezionato automaticamente lo stream audio di **massima qualità** disponibile (fino a ~130 kbps sorgente AAC/Opus, ri-codificato a 320 kbps)
 - 🏷️ **Metadata ID3**: titolo e artista scritti nel file MP3
 - 💾 **Salvataggio in `Music/ytmp3`** (visibile in File/Musica tramite MediaStore, niente permessi extra su Android 10+)

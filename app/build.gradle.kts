@@ -110,6 +110,10 @@ dependencies {
     // Thumbnail dei risultati di ricerca
     implementation("io.coil-kt:coil-compose:2.6.0")
 
+    // Riproduzione video in-app (Media3/ExoPlayer)
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
+
     // HTTP (ricerca YouTube + download dello stream audio)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 

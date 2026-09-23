@@ -58,7 +58,8 @@ object InnertubePlayer {
         )
     }
 
-    private fun requestAudioStream(client: PlayerClient, videoId: String): AudioStreamInfo {
+    /** Richiesta player comune: costruisce il body, verifica errori e playability. */
+    private fun playerResponse(client: PlayerClient, videoId: String): JSONObject {
         val (hl, gl) = Innertube.localeHlGl()
         val clientJson = JSONObject()
             .put("clientName", client.name)
@@ -93,6 +94,11 @@ object InnertubePlayer {
                 ?: "sconosciuto"
             throw IllegalStateException("video non riproducibile ($reason)")
         }
+        return root
+    }
+
+    private fun requestAudioStream(client: PlayerClient, videoId: String): AudioStreamInfo {
+        val root = playerResponse(client, videoId)
 
         val adaptive = root.optJSONObject("streamingData")?.optJSONArray("adaptiveFormats")
             ?: throw IllegalStateException("nessun formato disponibile")
@@ -120,4 +126,137 @@ object InnertubePlayer {
         return audioFormats.maxByOrNull { it.bitrate }
             ?: throw IllegalStateException("nessun flusso audio con URL diretto")
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // Riproduzione video in-app
+    // ---------------------------------------------------------------------------------------------
+
+    /** Estrae i codec da una mimeType del tipo `video/mp4; codecs="avc1.640028"`. */
+    private val CODECS_IN_MIME = Regex("codecs=\"([^\"]+)\"")
+
+    private data class Candidate(
+        val url: String,
+        val height: Int,
+        val bitrate: Int,
+        val isH264Mp4: Boolean,
+        val isAacMp4: Boolean,
+    )
+
+    /**
+     * Sorgenti per la riproduzione in-app: preferisce video adattivo (≤1080p, H.264/VP9,
+     * escluso AV1) fuso con l'audio separato; in alternativa il formato muxed (es. itag 18).
+     */
+    fun playbackSources(videoId: String): PlaybackSources {
+        val errors = mutableListOf<String>()
+        for (client in clients()) {
+            try {
+                val root = playerResponse(client, videoId)
+                return parsePlaybackSources(root)
+            } catch (t: Throwable) {
+                errors.add("${client.name}: ${t.message}")
+            }
+        }
+        throw IllegalStateException(
+            "Impossibile caricare il video. " + errors.joinToString(" · ")
+        )
+    }
+
+    private fun parsePlaybackSources(root: JSONObject): PlaybackSources {
+        val streaming = root.optJSONObject("streamingData")
+            ?: throw IllegalStateException("nessun formato disponibile")
+
+        val videoCandidates = mutableListOf<Candidate>()
+        val audioCandidates = mutableListOf<Candidate>()
+        val muxedCandidates = mutableListOf<Candidate>()
+
+        val adaptive = streaming.optJSONArray("adaptiveFormats")
+        if (adaptive != null) {
+            for (i in 0 until adaptive.length()) {
+                val f = adaptive.optJSONObject(i) ?: continue
+                val mime = f.optString("mimeType")
+                val url = f.optString("url")
+                if (url.isEmpty()) continue
+                // Alcuni client non espongono il campo "codecs": è contenuto nella mimeType
+                val codecs = f.optString("codecs").ifEmpty {
+                    CODECS_IN_MIME.find(mime)?.groupValues?.get(1).orEmpty()
+                }
+                val height = f.optInt("height")
+                val bitrate = f.optInt("averageBitrate").takeIf { it > 0 } ?: f.optInt("bitrate")
+                val candidate = Candidate(
+                    url = url,
+                    height = height,
+                    bitrate = bitrate,
+                    isH264Mp4 = mime.startsWith("video/mp4") && codecs.contains("avc1"),
+                    isAacMp4 = mime.startsWith("audio/mp4"),
+                )
+                when {
+                    mime.startsWith("video/") -> {
+                        // AV1 non è decodificato su molti dispositivi: escluso
+                        if (!codecs.contains("av01") && height in 1..1080) {
+                            videoCandidates.add(candidate)
+                        }
+                    }
+                    mime.startsWith("audio/") -> audioCandidates.add(candidate)
+                }
+            }
+        }
+
+        // Formati progressivi muxed (video+audio nello stesso flusso, es. itag 18 a 360p)
+        val progressive = streaming.optJSONArray("formats")
+        if (progressive != null) {
+            for (i in 0 until progressive.length()) {
+                val f = progressive.optJSONObject(i) ?: continue
+                val url = f.optString("url")
+                val height = f.optInt("height")
+                if (url.isNotEmpty() && f.optString("mimeType").startsWith("video/") && height > 0) {
+                    muxedCandidates.add(
+                        Candidate(url, height, f.optInt("bitrate"), false, false)
+                    )
+                }
+            }
+        }
+
+        val bestMuxed = muxedCandidates.maxByOrNull { it.height }
+        val bestVideo = videoCandidates.maxWithOrNull(
+            compareByDescending<Candidate> { it.height }
+                .thenByDescending { if (it.isH264Mp4) 1 else 0 }
+                .thenByDescending { it.bitrate }
+        )
+        val bestAudio = audioCandidates.maxWithOrNull(
+            compareByDescending<Candidate> { if (it.isAacMp4) 1 else 0 }
+                .thenByDescending { it.bitrate }
+        )
+
+        return when {
+            bestVideo != null && bestAudio != null &&
+                (bestMuxed == null || bestVideo.height >= bestMuxed.height) ->
+                PlaybackSources(
+                    videoUrl = bestVideo.url,
+                    audioUrl = bestAudio.url,
+                    height = bestVideo.height,
+                    isMuxed = false,
+                )
+            bestMuxed != null ->
+                PlaybackSources(
+                    videoUrl = bestMuxed.url,
+                    audioUrl = null,
+                    height = bestMuxed.height,
+                    isMuxed = true,
+                )
+            else -> throw IllegalStateException("nessun formato video riproducibile")
+        }
+    }
 }
+
+/**
+ * Sorgenti di riproduzione video.
+ *
+ * @property audioUrl null quando il flusso video è già muxed (contiene l'audio)
+ * @property isMuxed true per i formati progressivi (es. itag 18)
+ */
+data class PlaybackSources(
+    val videoUrl: String,
+    val audioUrl: String?,
+    val height: Int,
+    val isMuxed: Boolean,
+)

@@ -1,6 +1,8 @@
 package com.criscard90.ytmp3.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,7 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -25,6 +29,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,12 +47,14 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.criscard90.ytmp3.R
 import com.criscard90.ytmp3.download.DownloadManager
+import com.criscard90.ytmp3.player.PlayerActivity
 import com.criscard90.ytmp3.download.DownloadState
 import com.criscard90.ytmp3.ui.theme.YtDivider
 import com.criscard90.ytmp3.ui.theme.YtRed
 import com.criscard90.ytmp3.ui.theme.YtSurfaceVariant
 import com.criscard90.ytmp3.ui.theme.YtTextSecondary
 import com.criscard90.ytmp3.youtube.VideoSearchItem
+import com.criscard90.ytmp3.util.YouTubeOpener
 
 /**
  * Bottom sheet di conferma download con indicatore di stato in tempo reale.
@@ -60,6 +68,7 @@ fun VideoSheet(
 ) {
     val tasks by DownloadManager.tasks.collectAsState()
     val state = tasks.firstOrNull { it.videoId == video.videoId }?.state
+    val context = LocalContext.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -197,6 +206,42 @@ fun VideoSheet(
                     ) {
                         Text("Riprova", color = Color.White)
                     }
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // Azioni video: riproduzione in-app o apertura nell'app/browser YouTube
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = { PlayerActivity.start(context, video.videoId, video.title) },
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, YtDivider),
+                    shape = RoundedCornerShape(20.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Riproduci", color = Color.White, fontSize = 13.sp, maxLines = 1)
+                }
+                OutlinedButton(
+                    onClick = { YouTubeOpener.open(context, video.videoId) },
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, YtDivider),
+                    shape = RoundedCornerShape(20.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Apri su YouTube", color = Color.White, fontSize = 13.sp, maxLines = 1)
                 }
             }
 
