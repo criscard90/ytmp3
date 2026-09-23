@@ -47,7 +47,9 @@ jobs:
           EOF
 
       - name: Build release APK
-        run: ./gradlew assembleRelease -PciRunNumber=${{ github.run_number }} --stacktrace
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease -PciRunNumber=${{ github.run_number }} --stacktrace
 
       - name: Rename APK per ABI
         run: |
