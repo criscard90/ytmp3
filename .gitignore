@@ -1,0 +1,28 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Android
+local.properties
+captures/
+.externalNativeBuild
+.cxx/
+*.apk
+*.aab
+*.ap_
+
+# Signing (mai committare chiavi)
+keystore.properties
+*.jks
+*.keystore
+!debug.keystore
+
+# Notebook / appoggio locale
+*.log

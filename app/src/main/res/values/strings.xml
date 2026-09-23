@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ytmp3</string>
+    <string name="search_hint">Cerca</string>
+    <string name="search_empty_title">Cerca su YouTube</string>
+    <string name="search_empty_subtitle">Scarica l\'audio in MP3 alla massima qualità, senza login</string>
+</resources>
