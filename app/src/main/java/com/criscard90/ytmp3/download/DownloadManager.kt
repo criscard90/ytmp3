@@ -116,7 +116,13 @@ object DownloadManager {
             }
 
             setState(videoId, DownloadState.Converting)
-            val converted = Mp3Converter.convert(srcFile, mp3File, title, channel)
+            // Se lo stream è già AAC/MP4, in caso di problemi con FFmpeg si può
+            // reincapsulare in M4A con le API di sistema; per Opus/WebM serve
+            // per forza FFmpeg (MediaMuxer MPEG_4 li rifiuta).
+            val converted = Mp3Converter.convert(
+                srcFile, mp3File, title, channel,
+                preferredAac = stream.isMuxerFriendly,
+            )
 
             val displayName = "${sanitizeFileName(title)}.${converted.extension}"
             MediaStoreSaver.save(
