@@ -35,6 +35,10 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Install Android NDK + CMake (encoder MP3 nativo)
+        run: |
+          echo "y" | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --install "ndk;23.1.7779620" "cmake;3.22.1"
+
       - name: Configure release keystore (opzionale)
         if: ${{ env.KEYSTORE_B64 != '' }}
         run: |

@@ -27,6 +27,11 @@ android {
         targetSdk = 34
         versionCode = 1 + ciRunNumber
         versionName = "1.0.$ciRunNumber"
+
+        // Le .so native (libmp3lame) vengono compilate solo per questi ABI
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+        }
     }
 
     signingConfigs {
@@ -65,6 +70,16 @@ android {
             reset()
             include("armeabi-v7a", "arm64-v8a", "x86_64")
             isUniversalApk = true
+        }
+    }
+
+    // LAME 3.100 ha solo codice C portabile: la stessa versione NDK va usata
+    // in locale e in CI (vedi step "Install Android NDK + CMake" nel workflow).
+    ndkVersion = "23.1.7779620"
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
         }
     }
 

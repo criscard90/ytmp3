@@ -5,18 +5,24 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
+import com.criscard90.ytmp3.audio.NativeMp3Encoder
 import java.io.File
 import java.io.IOException
 import java.nio.ByteBuffer
 
 /**
- * Conversione audio sorgente → MP3 320 kbps con metadata ID3
- * usando FFmpeg (ffmpeg-kit, encoder libmp3lame).
+ * Conversione audio sorgente → MP3 320 kbps con metadata ID3.
  *
- * Se FFmpeg non si avvia sul dispositivo (es. `FFmpegKit failed to start`
- * su alcuni Xiaomi), usa il fallback nativo: il flusso AAC viene solo
- * reincapsulato in M4A (nessuna ricodifica) con le API di sistema, che
- * funzionano ovunque senza librerie native di terze parti.
+ * Ordine dei tentativi (il primo che riesce vince):
+ * 1. encoder MP3 nativo (MediaCodec di sistema + LAME compilata da noi con
+ *    NDK, `.so` dentro il nostro package): funziona con qualsiasi sorgente
+ *    (AAC/Opus/…) e NON dipende da ffmpeg-kit — questo è il percorso che
+ *    garantisce l'MP3;
+ * 2. FFmpeg (libmp3lame), tenuto per compatibilità se il percorso nativo
+ *    dovesse fallire;
+ * 3. SOLO per AAC: reincapsulamento in M4A con le API di sistema (nessuna
+ *    ricodifica). Per Opus/WebM non esiste fallback senza encoder — serve
+ *    per forza il punto 1 o 2.
  */
 object Mp3Converter {
 
@@ -37,6 +43,17 @@ object Mp3Converter {
         validateSource(src)
         val intermediates = mutableListOf<File>()
 
+        // 1) Encoder MP3 nativo (MediaCodec + LAME): il percorso che garantisce
+        //    sempre l'MP3, senza dipendere da FFmpeg.
+        val nativeError = runCatching {
+            NativeMp3Encoder.encode(src, dst, title, channel)
+            NativeProbe.checkMp3(dst)
+        }.exceptionOrNull()
+        if (nativeError == null) {
+            return ConvertedFile(dst, "audio/mpeg", "mp3")
+        }
+        dst.delete()
+
         // Percorso nativo (copia senza ricodifica): veloce e senza librerie native.
         // Vale SOLO per MP4/AAC: un WebM/Opus non può finire in un M4A e un raw
         // WebM non si apre come .mp3 — per quelli serve per forza FFmpeg.
@@ -52,7 +69,7 @@ object Mp3Converter {
             intermediates += native
         }
 
-        // Percorso principale: MP3 320 kbps con FFmpeg.
+        // 2) Percorso FFmpeg (compatibilità): solo se il nativo fallisce.
         val ffmpegError = runCatching {
             convertMp3(src, dst, title, channel)
             NativeProbe.checkMp3(dst)
@@ -76,9 +93,12 @@ object Mp3Converter {
             }
         }
         intermediates.forEach { it.delete() }
+        val cause = (nativeError ?: ffmpegError) as? Exception
         throw IOException(
-            "Conversione audio fallita (${ffmpegError.message ?: "errore FFmpeg"})",
-            ffmpegError as? Exception,
+            "Conversione MP3 fallita " +
+                "(nativo: ${nativeError?.message ?: "ok?"}, " +
+                "FFmpeg: ${ffmpegError?.message ?: "ok?"})",
+            cause,
         )
     }
 
